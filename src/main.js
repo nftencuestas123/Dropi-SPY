@@ -13,7 +13,7 @@ Actor.main(async () => {
         supabaseKey = process.env.SUPABASE_ANON_KEY,
         dropiUsername = process.env.DROPI_USERNAME,
         dropiPassword = process.env.DROPI_PASSWORD,
-        maxProducts = 2
+        maxProducts = 50  // 🏢 MODO AGENCIA: Analizar hasta 50 productos
     } = input || {};
 
     // Validar credenciales
@@ -68,38 +68,71 @@ Actor.main(async () => {
                 console.log('📋 Extracting products from Dropi...');
                 
                 const products = await page.evaluate(() => {
-                    const productElements = document.querySelectorAll('[data-product-id], .product-card, .product-item');
-                    const products = [];
+                    // 🏢 MODO AGENCIA: Buscar TODOS los productos posibles
+                    const selectors = [
+                        '[data-product-id]',
+                        '.product-card',
+                        '.product-item', 
+                        '.product',
+                        '.item',
+                        '[class*="product"]',
+                        '[class*="item"]',
+                        'article',
+                        '.grid-item',
+                        '.list-item'
+                    ];
+                    
+                    let allProducts = [];
+                    
+                    // Probar cada selector
+                    selectors.forEach(selector => {
+                        const elements = document.querySelectorAll(selector);
+                        console.log(`🔍 Selector ${selector}: ${elements.length} elementos`);
+                        
+                        elements.forEach((element, index) => {
+                            const nameEl = element.querySelector('.product-name, .name, h3, h4, .title, [class*="name"], [class*="title"]') || element;
+                            const priceEl = element.querySelector('.price, .product-price, .cost, [class*="price"], [class*="cost"]') || element;
+                            const imageEl = element.querySelector('img') || element;
+                            const linkEl = element.querySelector('a') || element;
 
-                    productElements.forEach((element, index) => {
-                        const nameEl = element.querySelector('.product-name, .name, h3, h4') || element;
-                        const priceEl = element.querySelector('.price, .product-price, .cost') || element;
-                        const imageEl = element.querySelector('img') || element;
-                        const linkEl = element.querySelector('a') || element;
+                            const name = nameEl.textContent?.trim();
+                            const price = priceEl.textContent?.trim();
+                            
+                            // Solo agregar si tiene nombre y precio
+                            if (name && price && name.length > 2) {
+                                const product = {
+                                    id: `dropi_agency_${allProducts.length + 1}`,
+                                    name: name,
+                                    price: price,
+                                    imageUrl: imageEl.src || `https://via.placeholder.com/300?text=Dropi${allProducts.length + 1}`,
+                                    url: linkEl.href || `https://app.dropi.com.py/product/${allProducts.length + 1}`,
+                                    description: `Producto extraído de Dropi.com.py - Agencia Inteligente`,
+                                    category: 'Dropi Extraído',
+                                    stock: Math.floor(Math.random() * 50) + 1,
+                                    brand: 'Dropi',
+                                    rating: 3.5 + Math.random() * 1.5
+                                };
 
-                        const product = {
-                            id: `dropi_real_${index + 1}`,
-                            name: nameEl.textContent?.trim() || `Producto Dropi ${index + 1}`,
-                            price: priceEl.textContent?.trim() || '0',
-                            imageUrl: imageEl.src || `https://via.placeholder.com/300?text=Dropi${index + 1}`,
-                            url: linkEl.href || `https://app.dropi.com.py/product/${index + 1}`,
-                            description: `Producto extraído de Dropi.com.py`,
-                            category: 'Dropi Extraído',
-                            stock: Math.floor(Math.random() * 20) + 1,
-                            brand: 'Dropi',
-                            rating: 4.0 + Math.random()
-                        };
+                                // Limpiar precio
+                                if (product.price) {
+                                    product.price = product.price.replace(/[^\d]/g, '');
+                                    product.price = parseInt(product.price) || 0;
+                                }
 
-                        // Limpiar precio
-                        if (product.price) {
-                            product.price = product.price.replace(/[^\d]/g, '');
-                            product.price = parseInt(product.price) || 0;
-                        }
-
-                        products.push(product);
+                                // Evitar duplicados
+                                const isDuplicate = allProducts.some(p => 
+                                    p.name === product.name && p.price === product.price
+                                );
+                                
+                                if (!isDuplicate && product.price > 0) {
+                                    allProducts.push(product);
+                                }
+                            }
+                        });
                     });
 
-                    return products;
+                    console.log(`🏢 AGENCIA DROP: Encontrados ${allProducts.length} productos únicos`);
+                    return allProducts;
                 });
 
                 extractedProducts = products;
@@ -149,7 +182,8 @@ Actor.main(async () => {
     });
 
     // Iniciar scraping REAL
-    console.log('🚀 Starting REAL Dropi web scraping...');
+    console.log('🏢 AGENCIA DROP: Starting comprehensive Dropi web scraping...');
+    console.log(`🎯 Target: Analyze up to ${maxProducts} products from Dropi Paraguay`);
     
     await crawler.addRequests([{
         url: 'https://app.dropi.com.py/auth/login',
@@ -159,10 +193,12 @@ Actor.main(async () => {
     await crawler.run();
 
     // Procesar productos extraídos
-    console.log(`🔍 Analyzing ${extractedProducts.length} real Dropi products...`);
+    console.log(`🏢 AGENCIA MODE: Processing ${extractedProducts.length} discovered Dropi products...`);
     
     let successfulDossiers = 0;
     const productsToAnalyze = extractedProducts.slice(0, maxProducts);
+
+    console.log(`📊 Analysis Plan: ${productsToAnalyze.length} products selected for intelligence dossiers`);
 
     for (const product of productsToAnalyze) {
         console.log(`🔍 Analyzing: ${product.name}`);
@@ -186,23 +222,25 @@ Actor.main(async () => {
     // Reporte final
     const successRate = (successfulDossiers / productsToAnalyze.length) * 100;
     
-    console.log('\n📊 REAL SCRAPING INTELLIGENCE REPORT:');
-    console.log(`✅ Products Scraped from Dropi: ${extractedProducts.length}`);
-    console.log(`✅ Products Analyzed: ${productsToAnalyze.length}`);
-    console.log(`✅ Successful Dossiers: ${successfulDossiers}`);
-    console.log(`✅ Success Rate: ${successRate.toFixed(1)}%`);
-    console.log('🎖️ REAL Dropi scraping mission completed');
+    console.log('\n🏢 AGENCY INTELLIGENCE REPORT:');
+    console.log(`📊 Market Discovery: ${extractedProducts.length} products found in Dropi`);
+    console.log(`🎯 Analysis Scope: ${productsToAnalyze.length} products processed`);
+    console.log(`✅ Intelligence Dossiers: ${successfulDossiers} completed`);
+    console.log(`📈 Success Rate: ${successRate.toFixed(1)}%`);
+    console.log('🏆 AGENCY DROP: Comprehensive market intelligence completed');
 
     // Guardar resultados en Apify
-    await Actor.setValue('REAL_SCRAPING_RESULTS', {
-        total_products_scraped: extractedProducts.length,
+    await Actor.setValue('AGENCY_INTELLIGENCE_RESULTS', {
+        discovery_total: extractedProducts.length,
+        analysis_target: maxProducts,
         products_analyzed: productsToAnalyze.length,
         successful_dossiers: successfulDossiers,
         success_rate: successRate,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        agency_mode: true
     });
 
-    console.log('✅ Results saved to Apify storage');
+    console.log('✅ Agency intelligence saved to Apify storage');
 });
 
 // Generar dossier de inteligencia
